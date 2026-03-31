@@ -63,6 +63,7 @@ function stopAllMusic() {
   for (var song in music) {
     if (music[song]) music[song].pause();
   }
+  currentMusic = null;
 }
 
 // choose a track and start it, resetting when needed
@@ -195,6 +196,14 @@ function resetGame() {
   spawnWave();
   updateHud();
   ui.pauseOverlay.classList.add("hidden");
+  stopAllMusic();
+}
+
+function startGame() {
+  ui.startOverlay.classList.add("hidden");
+  state.started = true;
+  lastTime = performance.now();
+  setPaused(false);
   playMusic("game", { reset: true });
 }
 
@@ -576,19 +585,21 @@ function loop(timestamp) {
   var delta = (timestamp - lastTime) / 16.666;
   lastTime = timestamp;
 
-  handleInput(delta, timestamp);
-  if (!state.gameOver && !state.paused) {
-    moveInvaders(delta);
-    updateBullets(delta);
-    updateEnemyBullets(delta);
-    maybeFireEnemy(timestamp);
-    checkCollisions();
-    if (state.invaders.length === 0) {
-      nextWave();
+  if (state.started) {
+    handleInput(delta, timestamp);
+    if (!state.gameOver && !state.paused) {
+      moveInvaders(delta);
+      updateBullets(delta);
+      updateEnemyBullets(delta);
+      maybeFireEnemy(timestamp);
+      checkCollisions();
+      if (state.invaders.length === 0) {
+        nextWave();
+      }
     }
-  }
-  if (!state.paused) {
-    updateRespawn(delta);
+    if (!state.paused) {
+      updateRespawn(delta);
+    }
   }
 
   drawBackground();
@@ -629,18 +640,12 @@ requestAnimationFrame(loop);
 
 // start the first game when the player clicks the start button
 ui.startBtn.addEventListener("click", function () {
-  ui.startOverlay.classList.add("hidden");
-  state.started = true;
-  setPaused(false);
-  playMusic("game", { reset: true });
+  startGame();
 });
 
 // allow restarting after seeing the game over overlay
 ui.restartBtn.addEventListener("click", function () {
   resetGame();
   ui.gameOver.classList.add("hidden");
-  ui.startOverlay.classList.add("hidden");
-  state.started = true;
-  setPaused(false);
-  playMusic("game", { reset: true });
+  startGame();
 });
