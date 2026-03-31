@@ -108,6 +108,7 @@ var config = {
   bullet: { width: 8, height: 18, speed: 6, cooldown: 320 },
   invader: { width: 35, height: 30, speed: 0.6, drop: 15, cols: 10, rows: 5 },
   enemyBullet: { width: 8, height: 18, speed: 4.0, cadence: 0.55 },
+  bunker: { count: 4, cellSize: 5, top: 472 },
   padding: 30,
 };
 
@@ -125,6 +126,7 @@ var state = {
   bullets: [],
   enemyBullets: [],
   invaders: [],
+  bunkers: [],
   direction: 1,
   score: 0,
   lives: 3,
@@ -181,6 +183,53 @@ function spawnWave() {
   }
 }
 
+function bunkerPattern() {
+  return [
+    "0001111111111111000",
+    "0011111111111111100",
+    "0111111111111111110",
+    "1111111111111111111",
+    "1111111111111111111",
+    "1111111111111111111",
+    "1111111111111111111",
+    "1111111000001111111",
+    "1111110000000111111",
+    "1111100000000011111",
+    "1111000000000001111",
+  ];
+}
+
+function buildBunkers() {
+  var pattern = bunkerPattern();
+  var rows = pattern.length;
+  var cols = pattern[0].length;
+  var width = cols * config.bunker.cellSize;
+  var totalWidth = config.bunker.count * width;
+  var gap = (canvas.width - config.padding * 2 - totalWidth) / (config.bunker.count - 1);
+  state.bunkers = [];
+
+  for (var index = 0; index < config.bunker.count; index++) {
+    var cells = [];
+    for (var row = 0; row < rows; row++) {
+      var cellRow = [];
+      for (var col = 0; col < cols; col++) {
+        cellRow.push(pattern[row][col] === "1");
+      }
+      cells.push(cellRow);
+    }
+    state.bunkers.push({
+      x: config.padding + index * (width + gap),
+      y: config.bunker.top,
+      width: width,
+      height: rows * config.bunker.cellSize,
+      cols: cols,
+      rows: rows,
+      cellSize: config.bunker.cellSize,
+      cells: cells,
+    });
+  }
+}
+
 // start a brand new run
 function resetGame() {
   state.score = 0;
@@ -194,6 +243,7 @@ function resetGame() {
   state.direction = 1;
   resetPlayer();
   spawnWave();
+  buildBunkers();
   updateHud();
   ui.pauseOverlay.classList.add("hidden");
   stopAllMusic();
@@ -235,6 +285,7 @@ function nextWave() {
   state.direction = 1;
   state.bullets = [];
   state.enemyBullets = [];
+  // Keep bunker damage between waves so each level stays harder than the last.
   spawnWave();
   updateHud();
 }
@@ -395,10 +446,93 @@ function rectsOverlap(a, b) {
   );
 }
 
+function damageBunker(bunker, impactX, impactY, fromEnemy) {
+  var localX = impactX - bunker.x;
+  var localY = impactY - bunker.y;
+  var centerCol = Math.floor(localX / bunker.cellSize);
+  var centerRow = Math.floor(localY / bunker.cellSize);
+  var mask = fromEnemy
+    ? [
+        [-1, -1], [0, -1], [1, -1],
+        [-1, 0], [0, 0], [1, 0],
+        [0, 1]
+      ]
+    : [
+        [0, -1],
+        [-1, 0], [0, 0], [1, 0],
+        [-1, 1], [0, 1], [1, 1]
+      ];
+
+  for (var i = 0; i < mask.length; i++) {
+    var col = centerCol + mask[i][0];
+    var row = centerRow + mask[i][1];
+    if (row < 0 || row >= bunker.rows || col < 0 || col >= bunker.cols) continue;
+    bunker.cells[row][col] = false;
+  }
+}
+
+function bulletHitsBunkers(bullet, fromEnemy) {
+  for (var i = 0; i < state.bunkers.length; i++) {
+    var bunker = state.bunkers[i];
+    if (!rectsOverlap(bullet, bunker)) continue;
+
+    var sampleX = bullet.x + bullet.width / 2;
+    var sampleY = fromEnemy ? bullet.y + bullet.height : bullet.y;
+    var localCol = Math.floor((sampleX - bunker.x) / bunker.cellSize);
+    var localRow = Math.floor((sampleY - bunker.y) / bunker.cellSize);
+
+    if (
+      localRow < 0 ||
+      localRow >= bunker.rows ||
+      localCol < 0 ||
+      localCol >= bunker.cols
+    ) {
+      continue;
+    }
+
+    if (!bunker.cells[localRow][localCol]) {
+      continue;
+    }
+
+    damageBunker(bunker, sampleX, sampleY, fromEnemy);
+    bullet.hit = true;
+    return true;
+  }
+  return false;
+}
+
+function updateBunkerDamageFromInvaders() {
+  for (var i = 0; i < state.invaders.length; i++) {
+    var invader = state.invaders[i];
+    for (var j = 0; j < state.bunkers.length; j++) {
+      var bunker = state.bunkers[j];
+      if (!rectsOverlap(invader, bunker)) continue;
+
+      var startCol = Math.max(0, Math.floor((invader.x - bunker.x) / bunker.cellSize));
+      var endCol = Math.min(
+        bunker.cols - 1,
+        Math.floor((invader.x + invader.width - bunker.x) / bunker.cellSize)
+      );
+      var startRow = Math.max(0, Math.floor((invader.y - bunker.y) / bunker.cellSize));
+      var endRow = Math.min(
+        bunker.rows - 1,
+        Math.floor((invader.y + invader.height - bunker.y) / bunker.cellSize)
+      );
+
+      for (var row = startRow; row <= endRow; row++) {
+        for (var col = startCol; col <= endCol; col++) {
+          bunker.cells[row][col] = false;
+        }
+      }
+    }
+  }
+}
+
 // see if bullets hit invaders or the player, and whether invaders reached the bottom
 function checkCollisions() {
   for (var i = 0; i < state.bullets.length; i++) {
     var bullet = state.bullets[i];
+    if (bulletHitsBunkers(bullet, false)) continue;
     for (var j = 0; j < state.invaders.length; j++) {
       var invader = state.invaders[j];
       if (!invader.dead && rectsOverlap(bullet, invader)) {
@@ -449,9 +583,11 @@ function checkCollisions() {
     loseLife();
   }
 
+  updateBunkerDamageFromInvaders();
 
   for (var eb = 0; eb < state.enemyBullets.length; eb++) {
     var b = state.enemyBullets[eb];
+    if (bulletHitsBunkers(b, true)) continue;
     if (rectsOverlap(b, playerBox) && !state.gameOver && !state.player.dead) {
       b.hit = true;
       loseLife();
@@ -474,6 +610,25 @@ function drawBackground() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   if (assetsReady) {
     ctx.drawImage(assets.background, 0, 0, canvas.width, canvas.height);
+  }
+}
+
+function drawBunkers() {
+  for (var i = 0; i < state.bunkers.length; i++) {
+    var bunker = state.bunkers[i];
+    for (var row = 0; row < bunker.rows; row++) {
+      for (var col = 0; col < bunker.cols; col++) {
+        if (!bunker.cells[row][col]) continue;
+        var x = bunker.x + col * bunker.cellSize;
+        var y = bunker.y + row * bunker.cellSize;
+        ctx.fillStyle = row < 2 ? "#fcb024" : "#f6543a";
+        ctx.fillRect(x, y, bunker.cellSize, bunker.cellSize);
+        ctx.fillStyle = "rgba(255, 244, 184, 0.22)";
+        ctx.fillRect(x, y, bunker.cellSize, 1);
+        ctx.fillStyle = "rgba(43, 0, 0, 0.28)";
+        ctx.fillRect(x, y + bunker.cellSize - 1, bunker.cellSize, 1);
+      }
+    }
   }
 }
 
@@ -604,6 +759,7 @@ function loop(timestamp) {
 
   drawBackground();
   if (state.started) {
+    drawBunkers();
     drawInvaders();
     drawBullets();
     drawEnemyBullets();
