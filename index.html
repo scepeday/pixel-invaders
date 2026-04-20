@@ -10,7 +10,10 @@
 <body>
   <main class="shell">
     <header class="hud">
-      <div id="score" class="hud__title">SCORE - 0 PTS</div>
+      <div class="hud__group">
+        <div id="score" class="hud__title">SCORE - 0 PTS</div>
+        <div id="bestScore" class="hud__best">BEST - 0 PTS</div>
+      </div>
       <div class="hud__stats">
         <span>Lives -</span>
         <span id="lives" class="hud__lives"></span>
@@ -22,6 +25,7 @@
       <div id="startOverlay" class="overlay start">
         <div class="panel start-panel">
           <img src="assets/Logo.svg" alt="Pixel Invaders" class="logo">
+          <div id="startPrompt" class="start-prompt">Press Start</div>
           <ul class="legend">
             <li>
               <img src="assets/invader_blue.svg" alt="Blue invader">
@@ -52,6 +56,11 @@
           <div class="pause-text">Paused</div>
           <div class="pause-hint">Press P to resume</div>
         </div>
+      </div>
+      <div class="touch-controls" aria-label="Touch controls">
+        <button id="touchLeft" class="touch-btn" aria-label="Move left">◀</button>
+        <button id="touchShoot" class="touch-btn touch-btn--wide" aria-label="Shoot">FIRE</button>
+        <button id="touchRight" class="touch-btn" aria-label="Move right">▶</button>
       </div>
     </section>
   </main>

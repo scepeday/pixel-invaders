@@ -40,6 +40,17 @@ body {
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.4), transparent);
 }
 
+.hud__group {
+  display: grid;
+  gap: 6px;
+}
+
+.hud__best {
+  font-size: clamp(12px, 1.4vw, 18px);
+  color: #ffd98b;
+  text-shadow: -2px 2px #4c2400;
+}
+
 .hud__stats {
   display: flex;
   gap: 12px;
@@ -93,9 +104,24 @@ canvas {
   padding: 24px 32px;
 }
 
+.start {
+  background:
+    linear-gradient(180deg, rgba(4, 5, 15, 0.78), rgba(4, 5, 15, 0.92)),
+    radial-gradient(circle at center, rgba(252, 176, 36, 0.08), transparent 55%);
+}
+
 .logo {
   width: min(720px, 90vw);
   height: auto;
+}
+
+.start-prompt {
+  font-size: clamp(20px, 3vw, 32px);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #ffd98b;
+  text-shadow: -3px 3px #431800;
+  animation: pulsePrompt 1.2s steps(2, end) infinite;
 }
 
 .legend {
@@ -201,8 +227,53 @@ canvas {
   color: #d7d7d7;
 }
 
+.touch-controls {
+  display: none;
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 14px;
+  justify-content: space-between;
+  gap: 12px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.touch-btn {
+  min-width: 72px;
+  min-height: 60px;
+  border: 3px solid rgba(252, 176, 36, 0.75);
+  background: rgba(8, 8, 18, 0.78);
+  color: var(--text);
+  font: inherit;
+  font-size: 24px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-shadow: -2px 2px #4c2400;
+  box-shadow: inset 0 0 0 2px rgba(246, 84, 58, 0.35);
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.touch-btn--wide {
+  flex: 1;
+}
+
 .hidden {
   display: none;
+}
+
+@keyframes pulsePrompt {
+  0%,
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  50% {
+    opacity: 0.45;
+    transform: translateY(-2px);
+  }
 }
 
 @media (max-width: 720px) {
@@ -216,11 +287,19 @@ canvas {
     justify-content: center;
   }
 
+  .hud__group {
+    justify-items: center;
+  }
+
   .legend img {
     width: 46px;
   }
 
   .legend-bullets {
     width: 90px;
+  }
+
+  .touch-controls {
+    display: flex;
   }
 }
